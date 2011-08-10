@@ -54,10 +54,10 @@ switch(enet)
         p=picaneeg_read_bdf_big(fname,'all','n');
         p.OtherData=p.EEG(:,129:137)';
         p.EEG=p.EEG(:,1:128);
-	p.EEG=p.EEG.*p.gain;
-	for ct=1:128  % itterate because we can't do it all in memory
-	  p.EEG(:,ct)=detrend(p.EEG(:,ct));
-	end
+	    p.EEG=p.EEG.*p.gain;
+	    for ct=1:128  % itterate because we can't do it all in memory
+	      p.EEG(:,ct)=detrend(p.EEG(:,ct));
+    	end
         p.SampleRate=p.fs;        
     case 'besa_dat' %assumes 128 channels
         [p.time,p.data,p.nEpochs] = readBESAsb(fname);
@@ -72,7 +72,8 @@ switch(enet)
         p.OtherData=p.data(129:137,:);     
     case 'emotiv_edf'
      [p.hdr] = read_edf(fname);
-     numsamps=p.hdr.orig.AS.spb;
+     %numsamps=p.hdr.orig.AS.spb;
+     numsamps=p.hdr.nSamples.*p.hdr.nTrials;
      [dat] = read_edf(fname, p.hdr, 1, numsamps);
      p.EEG=dat(3:16,:)';  % time x channels
      p.SampleRate=p.hdr.Fs;
@@ -121,6 +122,13 @@ if frequb~=0
 else
     p.EEGind=p.EEG';
 end
+
+if strcmp(absorrel,'rel')
+  p.EEGind=log((1+p.EEGind)./(1-p.EEGind));
+else
+  p.EEGind=log(p.EEGind);
+end
+
 
 % note: should allow alpha/theta bandwidth to vary per person
 

@@ -11,7 +11,9 @@ if nargin<2, winstart = 1; end
 p.winstart=winstart; p.winend=winend;
 
 winstartind=round((winstart./1000).*p.SampleRate);
-if winstartind<1, winstartind=1; end
+if winstartind<1
+    winstartind=1;
+end
 winendind=round((winend./1000).*p.SampleRate);
 win=winstartind:winendind;
 if winendind>size(p.EEGTrialData,3)
