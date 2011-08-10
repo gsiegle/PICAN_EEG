@@ -1,0 +1,138 @@
+function p=picanproceeg(fname,freqlb,frequb,enet,makesmall,absorrel,graphics,dorescaleoutliers)
+% usage:p=picanproceeg(fname,freqlb,frequb,enet,makesmall,absorrel)
+% freqlb and frequb are the frequency band to examine with wavelet power
+%   note - this is NOT a band-pass filter. Rather, a running power 
+%      estimate is returned
+%   for ERP use freqlb=0, frequb=0
+%   to use a tailored peak alpha estimate use alpha, freqlb=-1, frequb=-1
+% enet is one of:
+%   biosemi_bdf
+%   besa_dat
+%   emotiv_edf
+% makesmall means save only the data used by pican routines
+%   useful because eeg is so big
+% absorrel is one of 
+%   'abs'  - absolute power  transformed as log(x)
+%   'rel'  - relative power  transformed as log(x+1)/log(x-1)
+% graphics is whether plots are produced
+%  1=make plots
+%  0=no plots
+% dorescaleoutliers
+%  1=Windsorize outliers outside Tukey hinges
+%  0=don't Windsorize
+%
+% p is a structure containing the eeg data
+%   fields to compute: EEG, SampleRate, ChanLabels
+
+if nargin<2, freqlb=8; end
+if nargin<3, frequb=12; end
+if nargin<4,
+  ftype=fname(end-2:end);
+  switch(ftype)
+   case 'edf', enet='emotiv_edf';
+   case 'bdf', enet='biosemi_bdf';
+   case 'dat', enet='besa_dat'; %added by Josh 7/28
+  end
+end
+
+if nargin<5, makesmall=1; end
+if nargin<6, absorrel='abs'; end
+if nargin<7, graphics=0; end
+if nargin<8, 
+  if strcmp(computer,'PCWIN') & strcmp(enet,'biosemi_bdf')
+    dorescaleoutliers=0; % saves memory
+    fprintf('Not rescaling outliers to save memory.\n');
+  elseif strcmp (enet,'besa_dat'), dorescaleoutliers=0; %processed dat files 
+  %don't need rescale outliers? added by Josh 7/28
+  else
+    dorescaleoutliers=1; 
+  end
+end
+
+fprintf('Reading %s\n',fname);
+
+switch(enet)
+    case 'biosemi_bdf', %assumes 128 channels
+        p=pican_eeg_read_bdf_big(fname,'all','n');
+        p.OtherData=p.EEG(:,129:137)';
+        p.EEG=p.EEG(:,1:128);
+		p.EEG=p.EEG.*p.gain;
+	for ct=1:128  % itterate because we can't do it all in memory
+	  p.EEG(:,ct)=detrend(p.EEG(:,ct));
+	end
+        p.SampleRate=p.fs;        
+    case 'besa_dat' %assumes 128 channels
+        [p.time,p.data,p.nEpochs] = readBESAsb(fname);
+        p.EEG=p.data(1:128,:)';
+        fid=fopen([fname(1:end-4),'.generic'],'r');
+        if fid==-1
+          fid=fopen([fname(1:end-4),'.gen'],'r');        
+        end
+        fscanf(fid,'BESA Generic Data\n');
+        fscanf(fid,'nChannels=%i\n');
+        p.SampleRate = fscanf(fid,'sRate=%f\n');
+        p.OtherData=p.data(129:137,:);
+    case 'emotiv_edf'
+         [p.hdr] = read_edf(fname);
+         numsamps=p.hdr.orig.AS.spb;
+         [dat] = read_edf(fname, p.hdr, 1, numsamps);
+         p.EEG=dat(3:16,:)';  % time x channels
+         p.SampleRate=p.hdr.Fs;
+         p.ChanLabels=p.hdr.label(3:16);
+         p.OtherData=dat(34:35,:);
+end
+
+
+p.fname=fname;
+p.freqlb=freqlb;
+p.frequb=frequb;
+if ~isfield(p,'ChanLabels')
+  p.ChanLabels={'Cz';'Cz''';'CPz';'CPz''';'P1''';'E6';'P3''';'P3''';'PO5''';'PO7';'PO9''';'PO9';'O9';'O1''';'O1';'PO3''';'PO1''';'P1''';'Pz';'Pz''';'POz';'POz''';'Oz';'Oz''';'Iz';'O10';'O2''';'O2';'PO4''';'PO2''';'P2''';'P2''';'Cz''';'CP2''';'E35';'P4''';'P4''';'PO6''';'PO8';'PO8''';'PO10';'P8''';'P8';'P6''';'P6''';'TP8';'CP6''';'CP6''';'CP4''';'CP4''';'CP2''';'C2';'C2''';'C4';'C4''';'C6';'C6''';'T8';'FT8';'FC6''';'FC6''';'FC4''';'FC4''';'FC2''';'Cz''';'FC2''';'E67';'F4''';'F6''';'F6''';'F8';'AF8''';'AF6''';'F4''';'FC2''';'F2''';'F2''';'AF2''';'AF4''';'FP2';'FPz';'FPz''';'AFz';'AFz''';'Fz';'Fz''';'FCz';'FC1''';'F1''';'F1''';'AF1''';'AF3''';'FP1';'AF7''';'AF5''';'F3''';'Cz''';'FC1''';'E99';'F3''';'F5''';'F5''';'F7';'FT7';'FC5''';'FC5''';'FC3''';'FC3''';'FC1''';'C1';'Cz''';'CP1''';'CP1''';'C3''';'C3';'C5''';'C5';'T7''';'T7';'TP7';'CP5''';'CP5''';'CP3''';'CP3''';'P5''';'P5''';'P7';'P9''';};      
+end
+
+%% clean the raw eeg
+% Winsorize the outliers
+if dorescaleoutliers
+  p.EEG=rescaleoutlierstimeseries(p.EEG);
+end
+
+
+% get the frequency range for hihz to be represented
+if frequb<15, so=7;
+elseif frequb<25, so=4.5;
+else so=2;
+end
+if frequb~=0
+  for eegchan=1:size(p.EEG,2)
+    [ps,yax]=waveplot(squeeze(p.EEG(:,eegchan)),p.SampleRate,so,graphics,3,1);
+    % alpha is 8-13 hz which is 7:12
+    if eegchan==1
+      tmp=find(yax<freqlb);
+      lowbd=tmp(1)-1;
+      tmp=find(yax>frequb);
+      hibd=tmp(end)+1;
+      freqrange=hibd:lowbd;
+    end
+    p.EEGind(eegchan,:)=mean(ps(freqrange,:),1);
+    if strcmp(absorrel,'rel')
+      ps=waveplot(squeeze(p.EEG(:,eegchan)),p.SampleRate,2,graphics,3,1);
+      totalpower=mean(ps(:,:),1);
+      p.EEGind(eegchan,:)=p.EEGind(eegchan,:)./totalpower;
+    end
+  end
+else
+    p.EEGind=p.EEG';
+end
+
+% note: should allow alpha/theta bandwidth to vary per person
+
+if makesmall
+    pnew.fname=p.fname;
+    pnew.SampleRate=p.SampleRate;
+    pnew.ChanLabels=p.ChanLabels;
+    pnew.EEGind=p.EEGind;
+    pnew.freqlb=p.freqlb;
+    pnew.frequb=p.frequb;
+    pnew.OtherData=p.OtherData;
+    p=pnew;
+end
