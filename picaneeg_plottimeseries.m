@@ -1,10 +1,13 @@
-function picaneeg_plottimeseries(p,startsamp,endsamp,chanlist)
+function picaneeg_plottimeseries(p,startsamp,endsamp,chanlist,withtrials,withcondlabels)
 % usage picaneeg_plottimeseries(p,startsamp,endsamp,chanlist)
 % plots eeg timeseries acquired via picaneeg_loadraw
-if nargin < 2, startsamp=1; end
-if nargin < 3, endsamp=size(p.EEGind,2); end
-if nargin<4, chanlist=1:size(p.EEGind,1); end
+if (nargin < 2) | startsamp==0, startsamp=1; end
+if (nargin < 3) | endsamp==0, endsamp=size(p.EEGind,2); end
+if (nargin<4) | chanlist==0, chanlist=1:size(p.EEGind,1); end
+if nargin<5, withtrials=0; end
+if nargin<6, withcondlabels=0; end
 
+clf;
 mattoplot=p.EEGind(chanlist,startsamp:endsamp);
 
 matmax=max(prctile(mattoplot,80));
@@ -21,3 +24,20 @@ ylabel('{\mu}V');
 xlabel('Seconds');
 %view(0,-90);
 zoom xon;
+if withtrials
+  hold on;
+  ax=axis;
+  ts=zeros(size(xax))+ax(3);
+  ts(p.TrialStarts)=ax(4);
+  plot(xax,ts,'k');
+end
+if withcondlabels
+  ax=axis;
+  for ct=1:length(p.TrialStarts);
+    if isfield(p,'TrialTypesNoDrops')
+      text(p.TrialStarts(ct)./p.SampleRate,round(ax(4)-(ax(4)-ax(3))./length(p.ChanLabels)),char(p.CondLabels(p.TrialTypesNoDrops(ct))));
+    else
+      text(p.TrialStarts(ct)./p.SampleRate,round(ax(4)-(ax(4)-ax(3))./length(p.ChanLabels),char(p.CondLabels(p.TrialTypes(ct)))));
+    end
+  end
+end

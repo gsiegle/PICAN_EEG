@@ -78,7 +78,7 @@ switch(enet)
      p.EEG=dat(3:16,:)';  % time x channels
      p.SampleRate=p.hdr.Fs;
      p.ChanLabels=p.hdr.label(3:16);
-     p.OtherData=dat(34:35,:);
+     p.OtherData=dat(34:36,:);
 end
 
 
@@ -86,13 +86,7 @@ p.fname=fname;
 p.freqlb=freqlb;
 p.frequb=frequb;
 if ~isfield(p,'ChanLabels')
-  p.ChanLabels={'Cz';'Cz''';'CPz';'CPz''';'P1''';'E6';'P3''';'P3''';'PO5''';'PO7';'PO9''';'PO9';'O9';'O1''';'O1';'PO3''';'PO1''';'P1''';'Pz';'Pz''';'POz';'POz''';'Oz';'Oz''';'Iz';'O10';'O2''';'O2';'PO4''';'PO2''';'P2''';'P2''';'Cz''';'CP2''';'E35';'P4''';'P4''';'PO6''';'PO8';'PO8''';'PO10';'P8''';'P8';'P6''';'P6''';'TP8';'CP6''';'CP6''';'CP4''';'CP4''';'CP2''';'C2';'C2''';'C4';'C4''';'C6';'C6''';'T8';'FT8';'FC6''';'FC6''';'FC4''';'FC4''';'FC2''';'Cz''';'FC2''';'E67';'F4''';'F6''';'F6''';'F8';'AF8''';'AF6''';'F4''';'FC2''';'F2''';'F2''';'AF2''';'AF4''';'FP2';'FPz';'FPz''';'AFz';'AFz''';'Fz';'Fz''';'FCz';'FC1''';'F1''';'F1''';'AF1''';'AF3''';'FP1';'AF7''';'AF5''';'F3''';'Cz''';'FC1''';'E99';'F3''';'F5''';'F5''';'F7';'FT7';'FC5''';'FC5''';'FC3''';'FC3''';'FC1''';'C1';'Cz''';'CP1''';'CP1''';'C3''';'C3';'C5''';'C5';'T7''';'T7';'TP7';'CP5''';'CP5''';'CP3''';'CP3''';'P5''';'P5''';'P7';'P9''';};      
-end
-
-%% clean the raw eeg
-% Winsorize the outliers
-if dorescaleoutliers
-  p.EEG=rescaleoutlierstimeseries(p.EEG);
+  p.ChanLabels={'Cz';'Cz''';'CPz';'CPz''';'P1''';'E6';'P3''';'P3''';'PO5''';'PO7';'PO9''';'PO9';'O9';'O1''';'O1';'PO3''';'PO1''';'P1''';'Pz';'Pz''';'POz';'POz''';'Oz';'Oz''';'Iz';'O10';'O2''';'O2';'PO4''';'PO2''';'P2''';'P2''';'Cz''';'CP2''';'E35';'P4''';'P4''';'PO6''';'PO8';'PO8''';'PO10';'P8''';'P8';'P6''';'P6''';'TP8';'CP6''';'CP6''';'CP4''';'CP4''';'CP2''';'C2';'C2''';'C4';'C4''';'C6';'C6''';'T8';'FT8';'FC6''';'FC6''';'FC4''';'FC4''';'FC2''';'Cz''';'FC2''';'E67';'F4''';'F6''';'F6''';'F8';'AF8''';'AF6''';'F4''';'FC2''';'F2''';'F2''';'AF2''';'AF4''';'FP2';'FPz';'FPz''';'AFz';'AFz''';'Fz';'Fz''';'FCz';'FC1''';'F1''';'F1''';'AF1''';'AF3''';'FP1';'AF7''';'AF5''';'F3''';'Cz''';'FC1''';'E99';'F3''';'F5''';'F5''';'F7';'FT7';'FC5''';'FC5''';'FC3''';'FC3''';'FC1''';'C1';'Cz''';'CP1''';'CP1''';'C3''';'C3';'C5''';'C5';'T7''';'T7';'TP7';'CP5''';'CP5''';'CP3''';'CP3''';'P5''';'P5''';'P7';'P9'''};      
 end
 
 
@@ -102,8 +96,24 @@ elseif frequb<25, so=4.5;
 else so=2;
 end
 if frequb~=0
+  if dorescaleoutliers
+    %% clean the raw eeg
+    % Winsorize the outliers
+    medm=median(p.EEG);
+    iqrm=iqr(p.EEG);
+    q1=prctile(p.EEG,25);
+    q3=prctile(p.EEG,75);
+    
+    lbm=p.EEG<repmat(q1-1.5.*iqrm,size(p.EEG,1),1);
+    ubm=p.EEG>repmat(q3+1.5.*iqrm,size(p.EEG,1),1);
+    
+    outlier=(lbm | ubm)';
+    clear lbm ubm;
+  end
+  %[p.EEG,outlier]=rescaleoutlierstimeseries(p.EEG);
+  
   for eegchan=1:size(p.EEG,2)
-    [ps,yax]=waveplot(squeeze(p.EEG(:,eegchan)),p.SampleRate,so,graphics,3,1);
+    [ps,yax]=waveplot(squeeze(p.EEG(:,eegchan)),p.SampleRate,so,0,3,1);
     % alpha is 8-13 hz which is 7:12
     if eegchan==1
       tmp=find(yax<freqlb);
@@ -114,21 +124,56 @@ if frequb~=0
     end
     p.EEGind(eegchan,:)=mean(ps(freqrange,:),1);
     if strcmp(absorrel,'rel')
-      ps=waveplot(squeeze(p.EEG(:,eegchan)),p.SampleRate,2,graphics,3,1);
+      ps=waveplot(squeeze(p.EEG(:,eegchan)),p.SampleRate,2,0,3,1);
       totalpower=mean(ps(:,:),1);
       p.EEGind(eegchan,:)=p.EEGind(eegchan,:)./totalpower;
     end
   end
+  
+  if strcmp(absorrel,'rel')
+    p.EEGind=log((1+p.EEGind)./(1-p.EEGind));
+  else
+    p.EEGind=log(p.EEGind);
+  end
+
+if dorescaleoutliers
+    % interpolate the raw-bad-data-points
+    medm=median(p.EEGind');
+    iqrm=iqr(p.EEGind');
+    q1=prctile(p.EEGind',25);
+    q3=prctile(p.EEGind',75);
+    
+    lbm=p.EEGind'<repmat(q1-1.5.*iqrm,size(p.EEGind',1),1);
+    ubm=p.EEGind'>repmat(q3+1.5.*iqrm,size(p.EEGind',1),1);
+    
+    outlier=outlier | (lbm | ubm)';
+    clear lbm ubm;
+    
+    p.EEGind=(1-outlier).*p.EEGind+outlier.*-999;
+    for ct=1:size(p.EEGind,1)
+      p.EEGind(ct,:)=interpmissing(p.EEGind(ct,:));
+    end
+  end
+  
 else
+  if dorescaleoutliers
+    [p.EEGind,outlier]=rescaleoutlierstimeseries(p.EEG);
+    p.EEGind=p.EEGind'; outlier=outlier';
+  else
     p.EEGind=p.EEG';
+    
+    medm=median(p.EEG);
+    iqrm=iqr(p.EEG);
+    q1=prctile(p.EEG,25);
+    q3=prctile(p.EEG,75);
+    lbm=p.EEG<repmat(q1-1.5.*iqrm,size(p.EEG,1),1);
+    ubm=p.EEG>repmat(q3+1.5.*iqrm,size(p.EEG,1),1);
+    outlier=(lbm | ubm)';
+    clear lbm ubm;
+  end
 end
 
-if strcmp(absorrel,'rel')
-  p.EEGind=log((1+p.EEGind)./(1-p.EEGind));
-else
-  p.EEGind=log(p.EEGind);
-end
-
+p.propoutliers=mean(outlier);
 
 % note: should allow alpha/theta bandwidth to vary per person
 
@@ -140,5 +185,6 @@ if makesmall
     pnew.freqlb=p.freqlb;
     pnew.frequb=p.frequb;
     pnew.OtherData=p.OtherData;
+    pnew.propoutliers=p.propoutliers;
     p=pnew;
 end

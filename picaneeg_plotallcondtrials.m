@@ -35,8 +35,9 @@ end
 pcolor(xax,yax,dat(sortinds,:)); shading flat; 
 ylabel('Trial');
 subplot(2,1,2); 
+alltypes=unique(p.TrialTypesNoDrops);
 if condnum~=0
-  plot(xax,squeeze(p.CondMeans(condnum,channum,:)));
+  plot(xax,squeeze(p.CondMeans(position(condnum,alltypes),channum,:)));
 else
   plot(xax,squeeze(mean(p.CondMeans(:,channum,:),1)));
 end

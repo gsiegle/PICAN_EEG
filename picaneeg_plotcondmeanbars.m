@@ -1,5 +1,7 @@
-function picaneeg_plotcondmeans(p,chanlist);
-if nargin<2, 
+function picaneeg_plotcondmeanbars(p,chanlist,statname)
+% plots bars
+
+if (nargin<2) | (isempty(chanlist))
   channums=1:length(p.ChanLabels); 
 else
   % get the channel numbers we are interested
@@ -13,6 +15,10 @@ else
     end
   end
 end
+if nargin<3, statname='Mean'; end
+
+dat=getfield(p.CondStats,sprintf('Cond%s',statname));
+
 
 clf;
 % figure out how to lay out the channels
@@ -23,22 +29,25 @@ if (numhoriz.*numhoriz)<numchans
 else
   numvert=numhoriz;
 end
+
 xax=(1:size(p.CondMeans,3))./p.SampleRate;
 % plot condition related differences for each channel
 for chan=1:numchans
    subplot(numhoriz,numvert,chan);
-   plot(xax,squeeze(p.CondMeans(:,channums(chan),:))'); % plots condition-related averages for channel chan
+   bar(dat(:,chan));
    title(char(p.ChanLabels(channums(chan))));
+   set(gca,'XTick',1:size(dat,1));
+   set(gca,'XTickLabel',p.CondLabels);
    axis off;
-   axis tight;
+   axis tight; curax=axis;
+   axis([curax(1) curax(2) min(dat(:,chan)) curax(4)]);
    ax(chan,:)=axis;
 end
 for chan=1:numchans
-   subplot(numhoriz,numvert,chan);
-   axis([ax(1,1) ax(1,2) min(ax(:,3)) max(ax(:,4))]);
-   if p.frequb==0
-     view(0,-90);
-   end
+  subplot(numhoriz,numvert,chan);
+  axis([ax(1,1) ax(1,2) min(ax(:,3)) max(ax(:,4))]);
+  if p.frequb==0
+    view(0,-90);
+  end
 end
 axis on;
-legend(p.CondLabels);
